@@ -1,5 +1,6 @@
 # YouTrack Custom Workflows Library
-> Monorepo containing enterprise-grade JavaScript workflows and automation rules for YouTrack 2021.4+.
+
+Monorepo containing enterprise-grade JavaScript workflows and automation rules for YouTrack 2021.4+.
 
 ## 📂 Repository Structure
 

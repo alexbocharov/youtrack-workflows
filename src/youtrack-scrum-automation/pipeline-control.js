@@ -19,7 +19,7 @@ exports.rule = entities.Issue.onChange({
   guard: function(ctx) {
     return ctx.issue.fields.isChanged(ctx.State) || 
            ctx.issue.fields.isChanged(ctx.ReviewStage) || 
-           ctx.issue.fields.isChanged(ctx.Assignee); // Added trigger for Assignee changes
+           ctx.issue.fields.isChanged(ctx.Assignee);
   },
   action: function(ctx) {
     const issue = ctx.issue;
@@ -30,25 +30,51 @@ exports.rule = entities.Issue.onChange({
     const stateName = (issue.fields.State && issue.fields.State.name) ? issue.fields.State.name : '';
     const stageName = (issue.fields.ReviewStage && issue.fields.ReviewStage.name) ? issue.fields.ReviewStage.name : '';
 
-    // SCENARIO 5: SECURITY GATE - Restrict manual Assignee change during Code Review
+    // SCENARIO 5: SECURITY GATE - Restrict manual Assignee change to allowed Project Tech Leads roster
     if (issue.fields.isChanged(ctx.Assignee) && stateName === 'Test' && stageName === 'Code Review') {
       const newAssignee = issue.fields.Assignee;
-      const techLead = issue.fields.TechLeadTeam;
+      const techLeadOnCard = issue.fields.TechLeadTeam;
       
-      // If someone tries to set an assignee that doesn't match the Tech Lead field
-      if (newAssignee && techLead && newAssignee.login !== techLead.login) {
-        // Rollback the change immediately
-        issue.fields.Assignee = issue.fields.oldValue('Исполнитель');
+      if (newAssignee) {
+        var isAllowedUser = false;
         
-        // Show an enterprise-grade error message on the user's screen
-        const workflowMessage = require('@jetbrains/youtrack-scripting-api/workflow-message');
-        if (workflowMessage) {
-          workflowMessage.error('Запрещено! В статусе "Тестирование" на этапе "Code Review" исполнителем можно назначить ТОЛЬКО Техлида проекта (' + techLead.fullName + ').');
-        } else {
-          // Fallback for older API notations
-          ctx.message('Запрещено! На этапе Code Review исполнителем может быть только техлид.');
+        // 1. Allow if it matches the Tech Lead currently selected on the card
+        if (techLeadOnCard && newAssignee.login === techLeadOnCard.login) {
+          isAllowedUser = true;
         }
-        return; // Halt further execution of the script
+        
+        // 2. Allow if the user is the overall Project Leader
+        if (!isAllowedUser && issue.project && issue.project.leader && newAssignee.login === issue.project.leader.login) {
+          isAllowedUser = true;
+        }
+        
+        // 3. FIXED ROUTINE FOR 2021.4: Check against the preset roster values in the Project settings
+        if (!isAllowedUser) {
+          const projectFieldPrototype = issue.project.findFieldByName('Команда техлидов');
+          // Iterate through all default users attached to this field configuration
+          if (projectFieldPrototype && projectFieldPrototype.values) {
+            const allowedRoster = projectFieldPrototype.values;
+            if (allowedRoster && allowedRoster.size > 0 && allowedRoster.has(newAssignee)) {
+              isAllowedUser = true;
+              
+              // Synchronize the card field to keep UI consistent with the new assignee
+              issue.fields.TechLeadTeam = newAssignee;
+            }
+          }
+        }
+
+        // If the user fails validation - trigger safe rollback
+        if (!isAllowedUser) {
+          issue.fields.Assignee = issue.fields.oldValue('Исполнитель');
+          
+          const workflowMessage = require('@jetbrains/youtrack-scripting-api/workflow-message');
+          if (workflowMessage) {
+            workflowMessage.error('Запрещено! В статусе "Тестирование" на этапе "Code Review" исполнителем можно назначить только Техлида из списка настроек проекта.');
+          } else {
+            ctx.message('Запрещено! На этапе Code Review исполнителем может быть только техлид.');
+          }
+          return;
+        }
       }
     }
 
@@ -60,7 +86,6 @@ exports.rule = entities.Issue.onChange({
       targetPrefix = '[CR]';
       prefixChanged = true;
       
-      // Automatically set the ReviewStage field to "Code Review" on first transition
       if (stageName !== 'Code Review') {
         const reviewCodeField = issue.project.findFieldByName('Этап проверки');
         if (reviewCodeField) {
@@ -71,7 +96,6 @@ exports.rule = entities.Issue.onChange({
         }
       }
 
-      // FIXED FOR SINGLE USER FIELD: Directly assign the user from the field
       if (issue.fields.TechLeadTeam) {
         issue.fields.Assignee = issue.fields.TechLeadTeam;
       } else {
@@ -112,22 +136,19 @@ exports.rule = entities.Issue.onChange({
       prefixChanged = true;
     }
     
-    // SCENARIO 3: Tester found a bug and rejected the task back to "In Progress"
-    if (issue.fields.isChanged(ctx.State) && stateName === 'In Progress') {
+    // SCENARIO 3 & 4: Issue left the "Test" state to ANY other state (In Progress, Open, Done, etc.)
+    if (issue.fields.isChanged(ctx.State) && stateName !== 'Test') {
       const oldState = issue.fields.oldValue('State');
       if (oldState && oldState.name === 'Test') {
         targetPrefix = ''; 
         prefixChanged = true;
-        issue.fields.Assignee = issue.updatedBy;
+        
+        if (stateName === 'In Progress') {
+          issue.fields.Assignee = issue.updatedBy;
+        }
+        
         delete issue.fields['Этап проверки'];
       }
-    }
-    
-    // SCENARIO 4: Issue moved to the final "Done" state
-    if (issue.fields.isChanged(ctx.State) && stateName === 'Done') {
-      targetPrefix = ''; 
-      prefixChanged = true;
-      delete issue.fields['Этап проверки'];
     }
 
     // Apply the summary change safely as a direct string assignment

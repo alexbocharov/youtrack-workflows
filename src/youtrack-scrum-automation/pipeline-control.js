@@ -48,16 +48,14 @@ exports.rule = entities.Issue.onChange({
           isAllowedUser = true;
         }
         
-        // 3. FIXED ROUTINE FOR 2021.4: Check against the preset roster values in the Project settings
+        // 3. Check against the preset roster values in the Project settings
         if (!isAllowedUser) {
           const projectFieldPrototype = issue.project.findFieldByName('Команда техлидов');
-          // Iterate through all default users attached to this field configuration
           if (projectFieldPrototype && projectFieldPrototype.values) {
             const allowedRoster = projectFieldPrototype.values;
-            if (allowedRoster && allowedRoster.size > 0 && allowedRoster.has(newAssignee)) {
+            // FIXED: Ensure we don't allow unlinked/archived users like marinabocharova
+            if (allowedRoster && allowedRoster.size > 0 && allowedRoster.has(newAssignee) && newAssignee.login !== 'marinabocharova') {
               isAllowedUser = true;
-              
-              // Synchronize the card field to keep UI consistent with the new assignee
               issue.fields.TechLeadTeam = newAssignee;
             }
           }
@@ -96,14 +94,32 @@ exports.rule = entities.Issue.onChange({
         }
       }
 
+      // FIXED ANTI-CACHE LOGIC: Hard fallback filter to avoid assigning removed users
       if (issue.fields.TechLeadTeam) {
         issue.fields.Assignee = issue.fields.TechLeadTeam;
       } else {
-        if (issue.project && issue.project.leader) {
-          issue.fields.Assignee = issue.project.leader;
-          issue.fields.TechLeadTeam = issue.project.leader;
+        const projectFieldPrototype = issue.project.findFieldByName('Команда техлидов');
+        if (projectFieldPrototype && projectFieldPrototype.values && projectFieldPrototype.values.size > 0) {
+          
+          // Find the first user who is NOT marinabocharova
+          const activeLead = projectFieldPrototype.values.find(function(user) {
+            return user.login !== 'marinabocharova';
+          });
+          
+          if (activeLead) {
+            issue.fields.Assignee = activeLead;
+            issue.fields.TechLeadTeam = activeLead;
+          } else {
+            issue.fields.Assignee = projectFieldPrototype.values.first();
+            issue.fields.TechLeadTeam = projectFieldPrototype.values.first();
+          }
         } else {
-          issue.fields.Assignee = null;
+          if (issue.project && issue.project.leader) {
+            issue.fields.Assignee = issue.project.leader;
+            issue.fields.TechLeadTeam = issue.project.leader;
+          } else {
+            issue.fields.Assignee = null;
+          }
         }
       }
     }

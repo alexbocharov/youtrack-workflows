@@ -1,0 +1,12 @@
+{
+  "name" : "@alexbocharov/youtrack-scrum-automation",
+  "title" : "Scrum Automation",
+  "description" : null,
+  "dependencies" : {
+    "@jetbrains/youtrack-scripting-api" : "^2021.4.40426"
+  },
+  "youtrack" : {
+    "autoAttached" : false,
+    "visual" : false
+  }
+}

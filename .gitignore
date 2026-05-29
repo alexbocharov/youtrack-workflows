@@ -3,6 +3,10 @@
 Thumbs.db
 desktop.ini
 
+# Archives
+*.zip
+*.tar.gz
+
 # IDEs and Editors
 # JetBrains WebStorm / IntelliJ IDEA
 .idea/

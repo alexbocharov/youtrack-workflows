@@ -17,7 +17,7 @@ By binding issue text metadata to state-machine execution phases, this workflow 
            [ Column 1: OPEN ] ◄──────────────────────────────┐
                      │                                       │
                      ▼                                       │
-        [ Column 2: IN PROGRESS ]                            │
+           [ Column 2: IN PROGRESS ]                         │
                      │                                       │
                      ▼                                       │
            [ Column 3: TEST ]                                │

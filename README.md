@@ -4,16 +4,18 @@ Monorepo containing enterprise-grade JavaScript workflows and automation rules f
 
 ## 📂 Repository Structure
 
-All workflows are located inside the `src/` directory. Each workflow is isolated within its own folder containing the production JavaScript rules and a dedicated specification file:
+All workflows are organized as isolated packages inside the `src/` directory. Each workflow folder contains the production JavaScript rules, core technical specifications, and end-user documentation:
 
 ```text
 youtrack-workflows/
-├── README.md               # Global repository guide (This file)
+├── README.md                 # Global monorepo guide (This file)
 └── src/
-    ├── youtrack-scrum-automation/   # Development & QA delivery pipeline
-    │   ├── README.md       # Specific field mappings & workflow state machine
-    │   └── pipeline-control.js
-    └── [other-workflow]/   # Future automation rules
+    └── [workflow-name]/      # Isolated workflow package directory
+        ├── README.md         # Technical setup, guard logic & project requirements
+        ├── [rule-name].js    # Production JavaScript rule execution script
+        └── docs/             # Dedicated end-user documentation folder
+            ├── user-guide.md # Global operational instruction (English)
+            └── user-guide.ru.md # Localized step-by-step team manual (Russian)
 ```
 
 ## 🛠️ Development Principles for YouTrack 2021.4

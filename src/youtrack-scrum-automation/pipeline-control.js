@@ -48,14 +48,14 @@ exports.rule = entities.Issue.onChange({
           isAllowedUser = true;
         }
         
-        // 3. Check against the preset roster values in the Project settings
+        // 3. ROSTER VALIDATION: Allow selection from any valid user present in the field's project settings
         if (!isAllowedUser) {
           const projectFieldPrototype = issue.project.findFieldByName('Команда техлидов');
           if (projectFieldPrototype && projectFieldPrototype.values) {
             const allowedRoster = projectFieldPrototype.values;
-            // FIXED: Ensure we don't allow unlinked/archived users like marinabocharova
-            if (allowedRoster && allowedRoster.size > 0 && allowedRoster.has(newAssignee) && newAssignee.login !== 'marinabocharova') {
+            if (allowedRoster && allowedRoster.size > 0 && allowedRoster.has(newAssignee)) {
               isAllowedUser = true;
+              // Synchronize the technical card field with the new manually chosen assignee
               issue.fields.TechLeadTeam = newAssignee;
             }
           }
@@ -94,25 +94,16 @@ exports.rule = entities.Issue.onChange({
         }
       }
 
-      // FIXED ANTI-CACHE LOGIC: Hard fallback filter to avoid assigning removed users
+      // HIGH-VELOCITY ROUTINE: Instantly take the default or predefined value from the card
       if (issue.fields.TechLeadTeam) {
         issue.fields.Assignee = issue.fields.TechLeadTeam;
       } else {
+        // Fallback to project defaults if the card field is completely empty
         const projectFieldPrototype = issue.project.findFieldByName('Команда техлидов');
         if (projectFieldPrototype && projectFieldPrototype.values && projectFieldPrototype.values.size > 0) {
-          
-          // Find the first user who is NOT marinabocharova
-          const activeLead = projectFieldPrototype.values.find(function(user) {
-            return user.login !== 'marinabocharova';
-          });
-          
-          if (activeLead) {
-            issue.fields.Assignee = activeLead;
-            issue.fields.TechLeadTeam = activeLead;
-          } else {
-            issue.fields.Assignee = projectFieldPrototype.values.first();
-            issue.fields.TechLeadTeam = projectFieldPrototype.values.first();
-          }
+          const defaultLead = projectFieldPrototype.values.first();
+          issue.fields.Assignee = defaultLead;
+          issue.fields.TechLeadTeam = defaultLead;
         } else {
           if (issue.project && issue.project.leader) {
             issue.fields.Assignee = issue.project.leader;
